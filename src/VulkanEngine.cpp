@@ -15,7 +15,7 @@ static VulkanEngine* loadedEngine = nullptr;
 
 VulkanEngine::VulkanEngine() 
 {
-	const uint32_t windowHeight = 600, windowWidth = 800;
+	const uint32_t windowHeight = 800, windowWidth = 1200;
 	const std::vector<const char*> validationLayers = {
 		"VK_LAYER_KHRONOS_validation"
 	};
@@ -324,14 +324,6 @@ void VulkanEngine::draw() {
 	vk::DeviceQueueCreateInfo deviceQueueCreateInfo({});
 	vk::Queue queue = _device.getQueue(_queueFamilyIndex, 0);
 	queue.submit(submitInfos, _inflightFence);
-	
-	//vk::SubpassDependency subpassDependency({});
-	//subpassDependency.setSrcSubpass(vk::SubpassExternal);
-	//subpassDependency.setDstSubpass(0);
-	//subpassDependency.setSrcStageMask(vk::PipelineStageFlagBits::eColorAttachmentOutput);
-	//subpassDependency.setSrcAccessMask(vk::AccessFlagBits::eNone);
-	//subpassDependency.setDstStageMask(vk::PipelineStageFlagBits::eColorAttachmentOutput);
-	//subpassDependency.setDstAccessMask(vk::AccessFlagBits::eColorAttachmentWrite);
 	
 	vk::PresentInfoKHR presentInfo({});
 	presentInfo.setWaitSemaphores(_renderFinishedSemaphore);
