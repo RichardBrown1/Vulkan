@@ -35,5 +35,16 @@ class VulkanEngine {
 		vk::Fence _inflightFence;
 		vk::Extent2D _windowExtent;
 
+		//init
+		void initDevice();
+		void initSwapchain();
+		void initImageViews();
+		void initRenderPass();
+		void initFramebuffers();
+		void initCommandBuffers();
+		void initGraphicsPipeline();
+		void initSemaphores();
+
 		void draw();
+
 };

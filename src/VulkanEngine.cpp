@@ -13,7 +13,7 @@ const vk::Format VULKAN_FORMAT = vk::Format::eB8G8R8A8Unorm;
 
 static VulkanEngine* loadedEngine = nullptr;
 
-VulkanEngine::VulkanEngine() 
+VulkanEngine::VulkanEngine()
 {
 	const uint32_t windowHeight = 800, windowWidth = 1200;
 	const std::vector<const char*> validationLayers = {
@@ -27,26 +27,26 @@ VulkanEngine::VulkanEngine()
 	loadedEngine = this;
 
 	// Initialize SDL
-    if (SDL_Init(SDL_INIT_VIDEO) != 0) {
+	if (SDL_Init(SDL_INIT_VIDEO) != 0) {
 		throw std::runtime_error("SDL_CreateWindow Error: " + std::string(SDL_GetError()));
-    }
+	}
 
-    // Create an SDL window with Vulkan support
+	// Create an SDL window with Vulkan support
 	//TODO: resize support
-    SDL_Window* window = SDL_CreateWindow("Vulkan Window", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, windowWidth, windowHeight, (SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE));
-    if (!window) {
-        std::cerr << "SDL_CreateWindow Error: " << SDL_GetError() << std::endl;
-        SDL_Quit();
+	SDL_Window* window = SDL_CreateWindow("Vulkan Window", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, windowWidth, windowHeight, (SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE));
+	if (!window) {
+		std::cerr << "SDL_CreateWindow Error: " << SDL_GetError() << std::endl;
+		SDL_Quit();
 		throw std::runtime_error("SDL_CreateWindow Error: " + std::string(SDL_GetError()));
-    }
+	}
 
 	vk::ApplicationInfo applicationInfo(APPLICATION_NAME.c_str(), 1, ENGINE_NAME.c_str(), 1, VK_API_VERSION_1_3);
-	
+
 	unsigned int sdlExtensionCount;
 	SDL_Vulkan_GetInstanceExtensions(window, &sdlExtensionCount, nullptr);
 	std::vector<const char*> sdlExtensions(sdlExtensionCount);
 	SDL_Vulkan_GetInstanceExtensions(window, &sdlExtensionCount, sdlExtensions.data());
-	
+
 	vk::InstanceCreateInfo instanceCreateInfo({}, &applicationInfo, 0, nullptr, sdlExtensionCount, sdlExtensions.data());
 	auto instanceLayerProperties = vk::enumerateInstanceLayerProperties();
 	for (vk::LayerProperties ilp : instanceLayerProperties) {
@@ -56,7 +56,7 @@ VulkanEngine::VulkanEngine()
 
 	instanceCreateInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
 	instanceCreateInfo.ppEnabledLayerNames = validationLayers.data();
-	
+
 	vk::DebugUtilsMessengerCreateInfoEXT debugCreateInfo = {};
 	instanceCreateInfo.pNext = &debugCreateInfo;
 
@@ -72,8 +72,19 @@ VulkanEngine::VulkanEngine()
 	}
 	_surface = vk::SurfaceKHR(cSurface);
 
+	initDevice();
+	initSwapchain();
+	initImageViews();
+	initRenderPass();
+	initFramebuffers();
+	initCommandBuffers();
+	initGraphicsPipeline();
+	initSemaphores();
+}
+
+void VulkanEngine::initDevice() {
 	vk::PhysicalDevice physicalDevice = selectPhysicalDevice(_instance);
-	
+
 	//creating graphics queue
 	_queueFamilyIndex = 0;
 	auto queueFamilyProperties = physicalDevice.getQueueFamilyProperties();
@@ -83,10 +94,10 @@ VulkanEngine::VulkanEngine()
 			break;
 		}
 	}
-	
+
 	float queuePriority = 1.0f;
 	vk::DeviceQueueCreateInfo deviceQueueCreateInfo({}, _queueFamilyIndex, 1, &queuePriority);
-	
+
 	// Enable the extension
 	std::vector<const char*> deviceExtensions = { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
 
@@ -95,7 +106,9 @@ VulkanEngine::VulkanEngine()
 	deviceCreateInfo.ppEnabledExtensionNames = deviceExtensions.data();
 
 	_device = physicalDevice.createDevice(deviceCreateInfo);
+}
 
+void VulkanEngine::initSwapchain() {
 	//Swapchain setup
 	vk::SwapchainCreateInfoKHR swapchainCreateInfo({});
 	swapchainCreateInfo.surface = _surface; // The surface to present images to
@@ -112,14 +125,16 @@ VulkanEngine::VulkanEngine()
 	swapchainCreateInfo.clipped = VK_TRUE; // Clipping
 	swapchainCreateInfo.oldSwapchain = VK_NULL_HANDLE; // Old swapchain
 
-	_swapchain = _device.createSwapchainKHR(swapchainCreateInfo);	
+	_swapchain = _device.createSwapchainKHR(swapchainCreateInfo);
+}
 
+void VulkanEngine::initImageViews() {
 	//ImageViews setup
 	std::vector<vk::Image> images = _device.getSwapchainImagesKHR(_swapchain);
 	for (int i = 0; i < images.size(); i++) {
 		vk::ImageViewCreateInfo imageViewCreateInfo({});
 		imageViewCreateInfo.image = images[i];
-		imageViewCreateInfo.format = swapchainCreateInfo.imageFormat;
+		imageViewCreateInfo.format = VULKAN_FORMAT;
 		imageViewCreateInfo.viewType = vk::ImageViewType::e2D;
 
 		vk::ImageSubresourceRange imageSubresourceRange({});
@@ -130,7 +145,9 @@ VulkanEngine::VulkanEngine()
 		imageViewCreateInfo.subresourceRange = imageSubresourceRange;
 		_imageViews.push_back(_device.createImageView(imageViewCreateInfo));
 	}
-	
+}
+
+void VulkanEngine::initRenderPass() {
 	//RenderPass Setup
 	vk::RenderPassCreateInfo2 renderPassCreateInfo2({});
 	vk::SubpassDescription2 subpassDescription({});
@@ -144,7 +161,7 @@ VulkanEngine::VulkanEngine()
 	subpassDescription.setColorAttachments(attachmentReference);
 	renderPassCreateInfo2.setSubpasses(subpassDescriptions);
 	renderPassCreateInfo2.subpassCount = 1;
-	
+
 	vk::AttachmentDescription2 colorAttachment({});
 	colorAttachment.setFormat(VULKAN_FORMAT);
 	colorAttachment.setLoadOp(vk::AttachmentLoadOp::eClear);
@@ -158,7 +175,9 @@ VulkanEngine::VulkanEngine()
 	renderPassCreateInfo2.setAttachments(attachmentDescriptions);
 
 	_renderPass = _device.createRenderPass2(renderPassCreateInfo2);
-	
+}
+
+void VulkanEngine::initFramebuffers() {
 	//Framebuffer setup
 	for (int i = 0; i < _imageViews.size(); i++) {
 		vk::ImageView attachments[] = {
@@ -167,15 +186,17 @@ VulkanEngine::VulkanEngine()
 
 		vk::FramebufferCreateInfo framebufferCreateInfo({});
 		framebufferCreateInfo.renderPass = _renderPass;
-		framebufferCreateInfo.width = windowWidth;
-		framebufferCreateInfo.height = windowHeight;
+		framebufferCreateInfo.width = _windowExtent.width;
+		framebufferCreateInfo.height = _windowExtent.height;
 		framebufferCreateInfo.layers = 1;
 		framebufferCreateInfo.setAttachments(attachments);
 
 		vk::Framebuffer framebuffer = _device.createFramebuffer(framebufferCreateInfo);
 		_frameBuffers.push_back(framebuffer);
 	}
+}
 
+void VulkanEngine::initCommandBuffers() {
 	//CommandPool setup
 	vk::CommandPoolCreateInfo commandPoolCreateInfo({});
 	commandPoolCreateInfo.setFlags(vk::CommandPoolCreateFlagBits::eResetCommandBuffer);
@@ -186,8 +207,10 @@ VulkanEngine::VulkanEngine()
 	commandBufferAllocateInfo.commandPool = _commandPool;
 	commandBufferAllocateInfo.commandBufferCount = 1;
 	_commandBuffers = _device.allocateCommandBuffers(commandBufferAllocateInfo);
+}
 
-
+void VulkanEngine::initGraphicsPipeline() {
+	
 	//Graphics Pipeline
 	vk::ShaderModuleCreateInfo vertexShaderCreateInfo({});
 	std::vector<uint32_t> vertexShaderCode = readShader("shaders/vert.spv");
@@ -200,9 +223,9 @@ VulkanEngine::VulkanEngine()
 	fragmentShaderCreateInfo.setCode(fragmentShaderCode);
 	_fragmentShaderModule = _device.createShaderModule(fragmentShaderCreateInfo);
 	vk::PipelineShaderStageCreateInfo fragmentPipelineShaderStageCreateInfo = vk::PipelineShaderStageCreateInfo({}, vk::ShaderStageFlagBits::eFragment, _fragmentShaderModule, "main");
-	
-	vk::PipelineShaderStageCreateInfo pipelineShaderStageCreateInfoArray[] = {vertexPipelineShaderStageCreateInfo, fragmentPipelineShaderStageCreateInfo};
-	
+
+	vk::PipelineShaderStageCreateInfo pipelineShaderStageCreateInfoArray[] = { vertexPipelineShaderStageCreateInfo, fragmentPipelineShaderStageCreateInfo };
+
 	_pipelineLayout = _device.createPipelineLayout(vk::PipelineLayoutCreateInfo({}));
 
 	vk::DynamicState dynamicStateArray[] = { vk::DynamicState::eViewport, vk::DynamicState::eScissor };
@@ -210,11 +233,11 @@ VulkanEngine::VulkanEngine()
 	vk::PipelineMultisampleStateCreateInfo pipelineMultisampleStateCreateInfo({});
 	vk::PipelineVertexInputStateCreateInfo pipelineVertexInputStateCreateInfo({});
 	vk::PipelineInputAssemblyStateCreateInfo pipelineInputAssemblyStateCreateInfo({}, vk::PrimitiveTopology::eTriangleList, VK_FALSE);
-	
+
 	vk::PipelineRasterizationStateCreateInfo pipelineRasterizationStateCreateInfo({});
 	pipelineRasterizationStateCreateInfo.setRasterizerDiscardEnable(VK_FALSE);
 	pipelineRasterizationStateCreateInfo.setLineWidth(1.0);
-	
+
 	vk::PipelineViewportStateCreateInfo pipelineViewportStateCreateInfo({});
 	vk::Viewport viewport({});
 	viewport.setHeight(static_cast<float>(_windowExtent.height));
@@ -230,7 +253,7 @@ VulkanEngine::VulkanEngine()
 	pipelineColorBlendAttachmentState.setColorWriteMask(vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG | vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA);
 	vk::PipelineColorBlendStateCreateInfo pipelineColorBlendState({});
 	pipelineColorBlendState.setAttachments(pipelineColorBlendAttachmentState);
-	
+
 	vk::GraphicsPipelineCreateInfo graphicsPipelineCreateInfo({});
 	graphicsPipelineCreateInfo.setStages(pipelineShaderStageCreateInfoArray);
 	graphicsPipelineCreateInfo.setRenderPass(_renderPass);
@@ -244,7 +267,9 @@ VulkanEngine::VulkanEngine()
 	graphicsPipelineCreateInfo.setPColorBlendState(&pipelineColorBlendState);
 
 	_graphicsPipeline = _device.createGraphicsPipeline({}, graphicsPipelineCreateInfo).value;
+}
 
+void VulkanEngine::initSemaphores() {
 	_imageAvailableSemaphore = _device.createSemaphore(vk::SemaphoreCreateInfo({}));
 	_renderFinishedSemaphore = _device.createSemaphore(vk::SemaphoreCreateInfo({}));
 	vk::FenceCreateInfo fenceCreateInfo({});
