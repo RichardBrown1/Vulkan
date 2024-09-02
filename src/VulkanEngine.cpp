@@ -96,9 +96,6 @@ VulkanEngine::VulkanEngine()
 
 	_device = physicalDevice.createDevice(deviceCreateInfo);
 
-	vk::DeviceQueueInfo2 deviceQueueInfo({}, _queueFamilyIndex);
-	vk::Queue queue = _device.getQueue2(deviceQueueInfo);	
-
 	//Swapchain setup
 	vk::SwapchainCreateInfoKHR swapchainCreateInfo({});
 	swapchainCreateInfo.surface = _surface; // The surface to present images to
