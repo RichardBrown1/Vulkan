@@ -13,6 +13,40 @@ const vk::Format VULKAN_FORMAT = vk::Format::eB8G8R8A8Unorm;
 
 static VulkanEngine* loadedEngine = nullptr;
 
+struct Vertex {
+	float position[2];
+	float color[3];
+
+	static vk::VertexInputBindingDescription getBindingDescription() {
+		vk::VertexInputBindingDescription bindingDescription({});
+		bindingDescription.setStride(sizeof(Vertex));
+		bindingDescription.setInputRate(vk::VertexInputRate::eVertex);
+
+		return bindingDescription;
+	};
+
+	static std::array<vk::VertexInputAttributeDescription, 2> getAttributeDescriptions() {
+		std::array<vk::VertexInputAttributeDescription, 2> attributeDescriptions({});
+		attributeDescriptions[0].setLocation(0);
+		attributeDescriptions[0].setFormat(vk::Format::eR32G32Sfloat);
+		attributeDescriptions[0].setOffset(offsetof(Vertex, position));
+
+		attributeDescriptions[1].setLocation(1);
+		attributeDescriptions[1].setFormat(vk::Format::eR32G32B32Sfloat);
+		attributeDescriptions[1].setOffset(offsetof(Vertex, color));
+
+		return attributeDescriptions;
+	}
+};
+
+const std::vector<Vertex> vertices = {
+		{{0.0f, -0.5f}, {1.0f, 0.0f, 0.0f}},
+		{{0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}},
+		{{-0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}}
+};
+
+
+
 VulkanEngine::VulkanEngine()
 {
 	const uint32_t windowHeight = 800, windowWidth = 1200;
@@ -77,17 +111,19 @@ VulkanEngine::VulkanEngine()
 	initImageViews();
 	initRenderPass();
 	initFramebuffers();
+	initCommandPool();
+	initVertexBuffer();
 	initCommandBuffers();
 	initGraphicsPipeline();
 	initSemaphores();
 }
 
 void VulkanEngine::initDevice() {
-	vk::PhysicalDevice physicalDevice = selectPhysicalDevice(_instance);
+	_physicalDevice = selectPhysicalDevice(_instance);
 
 	//creating graphics queue
 	_queueFamilyIndex = 0;
-	auto queueFamilyProperties = physicalDevice.getQueueFamilyProperties();
+	auto queueFamilyProperties = _physicalDevice.getQueueFamilyProperties();
 	for (uint32_t i = 0; i < queueFamilyProperties.size(); ++i) {
 		if (queueFamilyProperties[i].queueFlags & vk::QueueFlagBits::eGraphics) {
 			_queueFamilyIndex = i;
@@ -105,7 +141,7 @@ void VulkanEngine::initDevice() {
 	deviceCreateInfo.enabledExtensionCount = static_cast<uint32_t>(deviceExtensions.size());
 	deviceCreateInfo.ppEnabledExtensionNames = deviceExtensions.data();
 
-	_device = physicalDevice.createDevice(deviceCreateInfo);
+	_device = _physicalDevice.createDevice(deviceCreateInfo);
 }
 
 void VulkanEngine::initSwapchain() {
@@ -196,12 +232,36 @@ void VulkanEngine::initFramebuffers() {
 	}
 }
 
-void VulkanEngine::initCommandBuffers() {
+void VulkanEngine::initCommandPool() {
 	//CommandPool setup
 	vk::CommandPoolCreateInfo commandPoolCreateInfo({});
 	commandPoolCreateInfo.setFlags(vk::CommandPoolCreateFlagBits::eResetCommandBuffer);
 	_commandPool = _device.createCommandPool(commandPoolCreateInfo);
+}
 
+void VulkanEngine::initVertexBuffer() {
+	vk::BufferCreateInfo vertexBufferCreateInfo({});
+	vertexBufferCreateInfo.setSize(sizeof(Vertex) * vertices.size());
+	vertexBufferCreateInfo.setUsage(vk::BufferUsageFlagBits::eVertexBuffer);
+	vertexBufferCreateInfo.setSharingMode(vk::SharingMode::eExclusive);
+	_vertexBuffer = _device.createBuffer(vertexBufferCreateInfo);
+
+	vk::MemoryRequirements memoryRequirements;
+	_device.getBufferMemoryRequirements(_vertexBuffer, &memoryRequirements);
+
+	vk::MemoryAllocateInfo memoryAllocateInfo({});
+	memoryAllocateInfo.setAllocationSize(memoryRequirements.size);
+	memoryAllocateInfo.setMemoryTypeIndex(findMemoryType(_physicalDevice, memoryRequirements.memoryTypeBits, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent));
+	_deviceMemory = _device.allocateMemory(memoryAllocateInfo);
+
+	_device.bindBufferMemory(_vertexBuffer, _deviceMemory, 0);
+
+	void* data =_device.mapMemory(_deviceMemory, 0, vertexBufferCreateInfo.size, {});
+	memcpy(data, vertices.data(), (size_t) vertexBufferCreateInfo.size);
+	_device.unmapMemory(_deviceMemory);
+}
+
+void VulkanEngine::initCommandBuffers() {
 	//CommandBuffer setup
 	vk::CommandBufferAllocateInfo commandBufferAllocateInfo({});
 	commandBufferAllocateInfo.commandPool = _commandPool;
@@ -210,19 +270,22 @@ void VulkanEngine::initCommandBuffers() {
 }
 
 void VulkanEngine::initGraphicsPipeline() {
-	
 	//Graphics Pipeline
 	vk::ShaderModuleCreateInfo vertexShaderCreateInfo({});
-	std::vector<uint32_t> vertexShaderCode = readShader("shaders/vert.spv");
+	//std::vector<uint32_t> vertexShaderCode = readShader("shaders/vert.spv");
+	std::vector<uint32_t> vertexShaderCode = readShader("shaders/v_shader.spv");
 	vertexShaderCreateInfo.setCode(vertexShaderCode);
 	_vertexShaderModule = _device.createShaderModule(vertexShaderCreateInfo);
-	vk::PipelineShaderStageCreateInfo vertexPipelineShaderStageCreateInfo = vk::PipelineShaderStageCreateInfo({}, vk::ShaderStageFlagBits::eVertex, _vertexShaderModule, "main");
+	vk::PipelineShaderStageCreateInfo vertexPipelineShaderStageCreateInfo = vk::PipelineShaderStageCreateInfo({}, vk::ShaderStageFlagBits::eVertex, _vertexShaderModule, "VS_main");
+
+
 
 	vk::ShaderModuleCreateInfo fragmentShaderCreateInfo({});
-	std::vector<uint32_t> fragmentShaderCode = readShader("shaders/frag.spv");
+	//std::vector<uint32_t> fragmentShaderCode = readShader("shaders/frag.spv");
+	std::vector<uint32_t> fragmentShaderCode = readShader("shaders/f_shader.spv");
 	fragmentShaderCreateInfo.setCode(fragmentShaderCode);
 	_fragmentShaderModule = _device.createShaderModule(fragmentShaderCreateInfo);
-	vk::PipelineShaderStageCreateInfo fragmentPipelineShaderStageCreateInfo = vk::PipelineShaderStageCreateInfo({}, vk::ShaderStageFlagBits::eFragment, _fragmentShaderModule, "main");
+	vk::PipelineShaderStageCreateInfo fragmentPipelineShaderStageCreateInfo = vk::PipelineShaderStageCreateInfo({}, vk::ShaderStageFlagBits::eFragment, _fragmentShaderModule, "FS_main");
 
 	vk::PipelineShaderStageCreateInfo pipelineShaderStageCreateInfoArray[] = { vertexPipelineShaderStageCreateInfo, fragmentPipelineShaderStageCreateInfo };
 
@@ -231,7 +294,13 @@ void VulkanEngine::initGraphicsPipeline() {
 	vk::DynamicState dynamicStateArray[] = { vk::DynamicState::eViewport, vk::DynamicState::eScissor };
 	vk::PipelineDynamicStateCreateInfo pipelineDynamicStateCreateInfo({}, dynamicStateArray);
 	vk::PipelineMultisampleStateCreateInfo pipelineMultisampleStateCreateInfo({});
+
+	std::vector<vk::VertexInputBindingDescription> bindingDescriptions = { Vertex::getBindingDescription() };
+	std::array<vk::VertexInputAttributeDescription, 2> attributeDescriptions = Vertex::getAttributeDescriptions();
+
 	vk::PipelineVertexInputStateCreateInfo pipelineVertexInputStateCreateInfo({});
+	pipelineVertexInputStateCreateInfo.setVertexBindingDescriptions(bindingDescriptions);
+	pipelineVertexInputStateCreateInfo.setVertexAttributeDescriptions(attributeDescriptions);
 	vk::PipelineInputAssemblyStateCreateInfo pipelineInputAssemblyStateCreateInfo({}, vk::PrimitiveTopology::eTriangleList, VK_FALSE);
 
 	vk::PipelineRasterizationStateCreateInfo pipelineRasterizationStateCreateInfo({});
@@ -313,7 +382,7 @@ void VulkanEngine::draw() {
 
 	p_commandBuffer->beginRenderPass(renderPassBeginInfo, vk::SubpassContents::eInline);
 	p_commandBuffer->bindPipeline(vk::PipelineBindPoint::eGraphics, _graphicsPipeline);
-	
+
 	vk::Viewport viewport({});
 	viewport.setHeight(static_cast<float>(_windowExtent.height));
 	viewport.setWidth(static_cast<float>(_windowExtent.width));
@@ -323,8 +392,11 @@ void VulkanEngine::draw() {
 	vk::Rect2D scissor({});
 	scissor.extent = _windowExtent;
 	p_commandBuffer->setScissor(0, scissor);
-
-	p_commandBuffer->draw(3, 1, 0, 0);
+	
+	vk::Buffer vertexBuffers[] = { _vertexBuffer };
+	vk::DeviceSize offsets[] = { 0 };
+	p_commandBuffer->bindVertexBuffers(0, vertexBuffers, offsets);
+	p_commandBuffer->draw(static_cast<uint32_t>(vertices.size()), 1, 0, 0);
 
 	p_commandBuffer->endRenderPass();
 	p_commandBuffer->end();
@@ -402,6 +474,9 @@ void VulkanEngine::destroy() {
 
 	_device.destroyShaderModule(_fragmentShaderModule);
 	_device.destroyShaderModule(_vertexShaderModule);
+
+	_device.destroyBuffer(_vertexBuffer);
+	_device.freeMemory(_deviceMemory);
 
 	_device.destroyCommandPool(_commandPool);
 	_device.destroyRenderPass(_renderPass);

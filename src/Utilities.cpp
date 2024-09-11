@@ -43,3 +43,23 @@ std::vector<uint32_t> readShader(const std::string& filename) {
 
 	return buffer;
 }
+
+//uint32_t findMemoryType(uint32_t typeFilter, vk::MemoryPropertyFlags memoryPropertyFlags) {
+//	vk::PhysicalDeviceMemoryProperties physicalDeviceMemoryProperties;
+//	
+//	for (auto x : physicalDeviceMemoryProperties.memoryTypes) {
+//		x.propertyFlags. vk::MemoryPropertyFlagBits::eHostCoherent;
+//	}
+//	physicalDeviceMemoryProperties.memoryTypes
+//}
+
+uint32_t findMemoryType(vk::PhysicalDevice physicalDevice, uint32_t typeFilter, vk::MemoryPropertyFlags properties) {
+	vk::PhysicalDeviceMemoryProperties memoryProperties = physicalDevice.getMemoryProperties();
+	for (uint32_t i = 0; i < memoryProperties.memoryTypeCount; i++) {
+		if ((typeFilter & (1 << i)) && (memoryProperties.memoryTypes[i].propertyFlags & properties) == properties) {
+			return i;
+		}
+	}
+	throw std::runtime_error("Failed to find suitable memory type!");
+}
+

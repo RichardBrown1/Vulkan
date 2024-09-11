@@ -16,6 +16,7 @@ class VulkanEngine {
 		void destroy();
 
 	private:
+		vk::PhysicalDevice _physicalDevice;
 		vk::Device _device;
 		vk::Instance _instance;
 		vk::SurfaceKHR _surface;
@@ -29,6 +30,8 @@ class VulkanEngine {
 		vk::RenderPass _renderPass;
 		vk::Pipeline _graphicsPipeline;
 		vk::CommandPool _commandPool;
+		vk::Buffer _vertexBuffer;
+		vk::DeviceMemory _deviceMemory;
 		std::vector<vk::CommandBuffer> _commandBuffers;
 		vk::Semaphore _imageAvailableSemaphore;
 		vk::Semaphore _renderFinishedSemaphore;
@@ -41,6 +44,8 @@ class VulkanEngine {
 		void initImageViews();
 		void initRenderPass();
 		void initFramebuffers();
+		void initCommandPool();
+		void initVertexBuffer();
 		void initCommandBuffers();
 		void initGraphicsPipeline();
 		void initSemaphores();
