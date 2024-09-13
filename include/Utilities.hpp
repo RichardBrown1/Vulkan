@@ -8,3 +8,4 @@ std::vector<uint32_t> readShader(const std::string& filename);
 
 uint32_t findMemoryType(vk::PhysicalDevice physicalDevice, uint32_t typeFilter, vk::MemoryPropertyFlags properties);
 
+vk::Buffer createDeviceBoundBuffer(vk::Device* device, vk::DeviceMemory* deviceMemory, vk::PhysicalDevice* physicalDevice, uint32_t bufferSize);

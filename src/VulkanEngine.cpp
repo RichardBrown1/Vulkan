@@ -240,24 +240,11 @@ void VulkanEngine::initCommandPool() {
 }
 
 void VulkanEngine::initVertexBuffer() {
-	vk::BufferCreateInfo vertexBufferCreateInfo({});
-	vertexBufferCreateInfo.setSize(sizeof(Vertex) * vertices.size());
-	vertexBufferCreateInfo.setUsage(vk::BufferUsageFlagBits::eVertexBuffer);
-	vertexBufferCreateInfo.setSharingMode(vk::SharingMode::eExclusive);
-	_vertexBuffer = _device.createBuffer(vertexBufferCreateInfo);
+	uint32_t vertexBufferSize = sizeof(Vertex) * static_cast<uint32_t>(vertices.size());
+	_vertexBuffer = createDeviceBoundBuffer(&_device, &_deviceMemory, &_physicalDevice, vertexBufferSize);
 
-	vk::MemoryRequirements memoryRequirements;
-	_device.getBufferMemoryRequirements(_vertexBuffer, &memoryRequirements);
-
-	vk::MemoryAllocateInfo memoryAllocateInfo({});
-	memoryAllocateInfo.setAllocationSize(memoryRequirements.size);
-	memoryAllocateInfo.setMemoryTypeIndex(findMemoryType(_physicalDevice, memoryRequirements.memoryTypeBits, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent));
-	_deviceMemory = _device.allocateMemory(memoryAllocateInfo);
-
-	_device.bindBufferMemory(_vertexBuffer, _deviceMemory, 0);
-
-	void* data =_device.mapMemory(_deviceMemory, 0, vertexBufferCreateInfo.size, {});
-	memcpy(data, vertices.data(), (size_t) vertexBufferCreateInfo.size);
+	void* data =_device.mapMemory(_deviceMemory, 0, vertexBufferSize, {});
+	memcpy(data, vertices.data(), (size_t) vertexBufferSize);
 	_device.unmapMemory(_deviceMemory);
 }
 
@@ -272,16 +259,12 @@ void VulkanEngine::initCommandBuffers() {
 void VulkanEngine::initGraphicsPipeline() {
 	//Graphics Pipeline
 	vk::ShaderModuleCreateInfo vertexShaderCreateInfo({});
-	//std::vector<uint32_t> vertexShaderCode = readShader("shaders/vert.spv");
 	std::vector<uint32_t> vertexShaderCode = readShader("shaders/v_shader.spv");
 	vertexShaderCreateInfo.setCode(vertexShaderCode);
 	_vertexShaderModule = _device.createShaderModule(vertexShaderCreateInfo);
 	vk::PipelineShaderStageCreateInfo vertexPipelineShaderStageCreateInfo = vk::PipelineShaderStageCreateInfo({}, vk::ShaderStageFlagBits::eVertex, _vertexShaderModule, "VS_main");
 
-
-
 	vk::ShaderModuleCreateInfo fragmentShaderCreateInfo({});
-	//std::vector<uint32_t> fragmentShaderCode = readShader("shaders/frag.spv");
 	std::vector<uint32_t> fragmentShaderCode = readShader("shaders/f_shader.spv");
 	fragmentShaderCreateInfo.setCode(fragmentShaderCode);
 	_fragmentShaderModule = _device.createShaderModule(fragmentShaderCreateInfo);
