@@ -122,17 +122,17 @@ void VulkanEngine::initDevice() {
 	_physicalDevice = selectPhysicalDevice(_instance);
 
 	//creating graphics queue
-	_queueFamilyIndex = 0;
+	uint32_t queueFamilyIndex = 0;
 	auto queueFamilyProperties = _physicalDevice.getQueueFamilyProperties();
 	for (uint32_t i = 0; i < queueFamilyProperties.size(); ++i) {
 		if (queueFamilyProperties[i].queueFlags & vk::QueueFlagBits::eGraphics) {
-			_queueFamilyIndex = i;
+			queueFamilyIndex = i;
 			break;
 		}
 	}
 
 	float queuePriority = 1.0f;
-	vk::DeviceQueueCreateInfo deviceQueueCreateInfo({}, _queueFamilyIndex, 1, &queuePriority);
+	vk::DeviceQueueCreateInfo deviceQueueCreateInfo({}, queueFamilyIndex, 1, &queuePriority);
 
 	// Enable the extension
 	std::vector<const char*> deviceExtensions = { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
@@ -142,6 +142,7 @@ void VulkanEngine::initDevice() {
 	deviceCreateInfo.ppEnabledExtensionNames = deviceExtensions.data();
 
 	_device = _physicalDevice.createDevice(deviceCreateInfo);
+	_graphicsQueue = _device.getQueue(queueFamilyIndex, 0);
 }
 
 void VulkanEngine::initSwapchain() {
@@ -241,11 +242,19 @@ void VulkanEngine::initCommandPool() {
 
 void VulkanEngine::initVertexBuffer() {
 	uint32_t vertexBufferSize = sizeof(Vertex) * static_cast<uint32_t>(vertices.size());
-	_vertexBuffer = createDeviceBoundBuffer(&_device, &_deviceMemory, &_physicalDevice, vertexBufferSize);
+
+	vk::DeviceMemory stagingBufferDeviceMemory = vk::DeviceMemory();
+	vk::Buffer stagingBuffer = createBuffer(&_device, &_deviceMemory, &_physicalDevice, vk::BufferUsageFlagBits::eTransferSrc , (vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent) , vertexBufferSize);
 
 	void* data =_device.mapMemory(_deviceMemory, 0, vertexBufferSize, {});
 	memcpy(data, vertices.data(), (size_t) vertexBufferSize);
 	_device.unmapMemory(_deviceMemory);
+	
+	_vertexBuffer = createBuffer(&_device, &_deviceMemory, &_physicalDevice, vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eVertexBuffer, vk::MemoryPropertyFlagBits::eDeviceLocal, vertexBufferSize);
+	copyBuffer(_device, stagingBuffer, _vertexBuffer, vertexBufferSize, _commandPool, _graphicsQueue);
+
+	_device.destroyBuffer(stagingBuffer);
+	_device.freeMemory(stagingBufferDeviceMemory);
 }
 
 void VulkanEngine::initCommandBuffers() {
@@ -399,8 +408,7 @@ void VulkanEngine::draw() {
 	std::vector<vk::SubmitInfo> submitInfos = { submitInfo };
 
 	vk::DeviceQueueCreateInfo deviceQueueCreateInfo({});
-	vk::Queue queue = _device.getQueue(_queueFamilyIndex, 0);
-	queue.submit(submitInfos, _inflightFence);
+	_graphicsQueue.submit(submitInfos, _inflightFence);
 	
 	vk::PresentInfoKHR presentInfo({});
 	presentInfo.setWaitSemaphores(_renderFinishedSemaphore);
@@ -408,7 +416,7 @@ void VulkanEngine::draw() {
 	presentInfo.setSwapchains(swapchains);
 	presentInfo.setImageIndices(imageIndex);
 
-	vk::Result queuePresentResult = queue.presentKHR(presentInfo);
+	vk::Result queuePresentResult = _graphicsQueue.presentKHR(presentInfo);
 	if (queuePresentResult != vk::Result::eSuccess) {
 		throw queuePresentResult;
 	}

@@ -44,23 +44,53 @@ std::vector<uint32_t> readShader(const std::string& filename) {
 	return buffer;
 }
 
-vk::Buffer createDeviceBoundBuffer(vk::Device* device, vk::DeviceMemory* deviceMemory, vk::PhysicalDevice* physicalDevice, uint32_t bufferSize) {
-	vk::BufferCreateInfo vertexBufferCreateInfo({});
-	vertexBufferCreateInfo.setSize(bufferSize);
-	vertexBufferCreateInfo.setUsage(vk::BufferUsageFlagBits::eVertexBuffer);
-	vertexBufferCreateInfo.setSharingMode(vk::SharingMode::eExclusive);
-	vk::Buffer vertexBuffer = device->createBuffer(vertexBufferCreateInfo);
+vk::Buffer createBuffer(vk::Device* device, vk::DeviceMemory* deviceMemory, vk::PhysicalDevice* physicalDevice, vk::BufferUsageFlags bufferUsageFlags, vk::MemoryPropertyFlags memoryPropertyFlags, uint32_t bufferSize) {
+	vk::BufferCreateInfo bufferCreateInfo({});
+	bufferCreateInfo.setSize(bufferSize);
+	bufferCreateInfo.setUsage(bufferUsageFlags);
+	bufferCreateInfo.setSharingMode(vk::SharingMode::eExclusive);
+	vk::Buffer vertexBuffer = device->createBuffer(bufferCreateInfo);
 
 	vk::MemoryRequirements memoryRequirements;
 	device->getBufferMemoryRequirements(vertexBuffer, &memoryRequirements);
 
 	vk::MemoryAllocateInfo memoryAllocateInfo({});
 	memoryAllocateInfo.setAllocationSize(memoryRequirements.size);
-	memoryAllocateInfo.setMemoryTypeIndex(findMemoryType(*physicalDevice, memoryRequirements.memoryTypeBits, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent));
+	memoryAllocateInfo.setMemoryTypeIndex(findMemoryType(*physicalDevice, memoryRequirements.memoryTypeBits, memoryPropertyFlags));
 	*deviceMemory = device->allocateMemory(memoryAllocateInfo);
 
 	device->bindBufferMemory(vertexBuffer, *deviceMemory, 0);
 	return vertexBuffer;
+}
+
+void copyBuffer(vk::Device device, vk::Buffer srcBuffer, vk::Buffer dstBuffer, vk::DeviceSize deviceSize, vk::CommandPool commandPool, vk::Queue queue) {
+	vk::CommandBufferAllocateInfo allocInfo{};
+	allocInfo.setLevel(vk::CommandBufferLevel::ePrimary);
+	allocInfo.setCommandPool(commandPool);
+	allocInfo.setCommandBufferCount(1);
+
+	vk::CommandBuffer commandBuffer;
+	if (vk::Result::eSuccess != device.allocateCommandBuffers(&allocInfo, &commandBuffer)) {
+		throw std::runtime_error("failed allocating Command Buffers");
+	}
+
+	vk::CommandBufferBeginInfo commandBufferBeginInfo({});
+	commandBufferBeginInfo.setFlags(vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
+	commandBuffer.begin(commandBufferBeginInfo);
+
+	vk::BufferCopy copyRegion({});
+	copyRegion.setSize(deviceSize);
+
+	commandBuffer.copyBuffer(srcBuffer, dstBuffer, copyRegion);
+	commandBuffer.end();
+
+	vk::SubmitInfo submitInfo({});
+	submitInfo.setCommandBuffers(commandBuffer);
+	
+	queue.submit(submitInfo, nullptr);
+	queue.waitIdle();
+
+	device.freeCommandBuffers(commandPool, commandBuffer);
 }
 
 //uint32_t findMemoryType(uint32_t typeFilter, vk::MemoryPropertyFlags memoryPropertyFlags) {

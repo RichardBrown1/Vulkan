@@ -18,9 +18,9 @@ class VulkanEngine {
 	private:
 		vk::PhysicalDevice _physicalDevice;
 		vk::Device _device;
+		vk::Queue _graphicsQueue;
 		vk::Instance _instance;
 		vk::SurfaceKHR _surface;
-		uint32_t _queueFamilyIndex;
 		vk::SwapchainKHR _swapchain;
 		std::vector<vk::ImageView> _imageViews;
 		std::vector<vk::Framebuffer> _frameBuffers;
