@@ -31,6 +31,7 @@ class VulkanEngine {
 		vk::Pipeline _graphicsPipeline;
 		vk::CommandPool _commandPool;
 		vk::Buffer _vertexBuffer;
+		vk::Buffer _indexBuffer;
 		vk::DeviceMemory _deviceMemory;
 		std::vector<vk::CommandBuffer> _commandBuffers;
 		vk::Semaphore _imageAvailableSemaphore;
@@ -46,6 +47,7 @@ class VulkanEngine {
 		void initFramebuffers();
 		void initCommandPool();
 		void initVertexBuffer();
+		void initIndexBuffer();
 		void initCommandBuffers();
 		void initGraphicsPipeline();
 		void initSemaphores();

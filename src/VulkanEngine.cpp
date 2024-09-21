@@ -40,9 +40,14 @@ struct Vertex {
 };
 
 const std::vector<Vertex> vertices = {
-		{{0.0f, -0.5f}, {1.0f, 0.0f, 0.0f}},
-		{{0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}},
-		{{-0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}}
+	{{-0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}},
+	{{0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}},
+	{{0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}},
+	{{-0.5f, 0.5f}, {1.0f, 1.0f, 1.0f}}
+};
+
+const std::vector<uint16_t> indices = {
+	0, 1, 2, 2, 3, 0
 };
 
 
@@ -113,6 +118,7 @@ VulkanEngine::VulkanEngine()
 	initFramebuffers();
 	initCommandPool();
 	initVertexBuffer();
+	initIndexBuffer();
 	initCommandBuffers();
 	initGraphicsPipeline();
 	initSemaphores();
@@ -244,17 +250,34 @@ void VulkanEngine::initVertexBuffer() {
 	uint32_t vertexBufferSize = sizeof(Vertex) * static_cast<uint32_t>(vertices.size());
 
 	vk::DeviceMemory stagingBufferDeviceMemory = vk::DeviceMemory();
-	vk::Buffer stagingBuffer = createBuffer(&_device, &_deviceMemory, &_physicalDevice, vk::BufferUsageFlagBits::eTransferSrc , (vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent) , vertexBufferSize);
+	vk::Buffer stagingBuffer = createBuffer(&_device, &stagingBufferDeviceMemory, &_physicalDevice, vk::BufferUsageFlagBits::eTransferSrc , (vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent) , vertexBufferSize);
 
-	void* data =_device.mapMemory(_deviceMemory, 0, vertexBufferSize, {});
+	void* data =_device.mapMemory(stagingBufferDeviceMemory, 0, vertexBufferSize, {});
 	memcpy(data, vertices.data(), (size_t) vertexBufferSize);
-	_device.unmapMemory(_deviceMemory);
+	_device.unmapMemory(stagingBufferDeviceMemory);
 	
 	_vertexBuffer = createBuffer(&_device, &_deviceMemory, &_physicalDevice, vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eVertexBuffer, vk::MemoryPropertyFlagBits::eDeviceLocal, vertexBufferSize);
 	copyBuffer(_device, stagingBuffer, _vertexBuffer, vertexBufferSize, _commandPool, _graphicsQueue);
 
 	_device.destroyBuffer(stagingBuffer);
 	_device.freeMemory(stagingBufferDeviceMemory);
+}
+
+void VulkanEngine::initIndexBuffer() {
+	uint32_t indexBufferSize = sizeof(uint16_t) * static_cast<uint32_t>(indices.size());
+
+	vk::DeviceMemory stagingBufferDeviceMemory = vk::DeviceMemory();
+	vk::Buffer stagingBuffer = createBuffer(&_device, &stagingBufferDeviceMemory, &_physicalDevice, vk::BufferUsageFlagBits::eTransferSrc, (vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent), indexBufferSize);
+
+	void* data = _device.mapMemory(stagingBufferDeviceMemory, 0, indexBufferSize, {});
+	memcpy(data, indices.data(), (size_t) indexBufferSize);
+	_device.unmapMemory(stagingBufferDeviceMemory);
+
+	_indexBuffer = createBuffer(&_device, &_deviceMemory, &_physicalDevice, vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eIndexBuffer, vk::MemoryPropertyFlagBits::eDeviceLocal, indexBufferSize);
+	copyBuffer(_device, stagingBuffer, _indexBuffer, indexBufferSize, _commandPool, _graphicsQueue);
+
+	_device.destroyBuffer(stagingBuffer);
+	_device.freeMemory(stagingBufferDeviceMemory);	
 }
 
 void VulkanEngine::initCommandBuffers() {
@@ -388,7 +411,11 @@ void VulkanEngine::draw() {
 	vk::Buffer vertexBuffers[] = { _vertexBuffer };
 	vk::DeviceSize offsets[] = { 0 };
 	p_commandBuffer->bindVertexBuffers(0, vertexBuffers, offsets);
-	p_commandBuffer->draw(static_cast<uint32_t>(vertices.size()), 1, 0, 0);
+	p_commandBuffer->bindIndexBuffer(_indexBuffer, 0, vk::IndexType::eUint16);
+	
+	//p_commandBuffer->draw(static_cast<uint32_t>(vertices.size()), 1, 0, 0);
+
+	p_commandBuffer->drawIndexed(static_cast<uint32_t>(indices.size()), 1, 0, 0, 0);
 
 	p_commandBuffer->endRenderPass();
 	p_commandBuffer->end();
@@ -466,6 +493,7 @@ void VulkanEngine::destroy() {
 	_device.destroyShaderModule(_fragmentShaderModule);
 	_device.destroyShaderModule(_vertexShaderModule);
 
+	_device.destroyBuffer(_indexBuffer);
 	_device.destroyBuffer(_vertexBuffer);
 	_device.freeMemory(_deviceMemory);
 
