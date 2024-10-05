@@ -26,6 +26,9 @@ class VulkanEngine {
 		std::vector<vk::Framebuffer> _frameBuffers;
 		vk::ShaderModule _fragmentShaderModule;
 		vk::ShaderModule _vertexShaderModule;
+		vk::DescriptorPool _descriptorPool;
+		std::vector<vk::DescriptorSet> _descriptorSets;
+		vk::DescriptorSetLayout _descriptorSetLayout;		
 		vk::PipelineLayout _pipelineLayout;
 		vk::RenderPass _renderPass;
 		vk::Pipeline _graphicsPipeline;
@@ -33,11 +36,15 @@ class VulkanEngine {
 		vk::Buffer _vertexBuffer;
 		vk::Buffer _indexBuffer;
 		vk::DeviceMemory _deviceMemory;
+		std::vector<vk::Buffer> _uniformBuffers;
+		std::vector<vk::DeviceMemory> _uniformBufferDeviceMemories;
+		std::vector<void*> _uniformBuffersMapped;
 		std::vector<vk::CommandBuffer> _commandBuffers;
-		vk::Semaphore _imageAvailableSemaphore;
-		vk::Semaphore _renderFinishedSemaphore;
-		vk::Fence _inflightFence;
+		std::vector<vk::Semaphore> _imageAvailableSemaphores;
+		std::vector<vk::Semaphore> _renderFinishedSemaphores;
+		std::vector<vk::Fence> _inflightFences;
 		vk::Extent2D _windowExtent;
+		uint32_t currentFrame = 0;
 
 		//init
 		void initDevice();
@@ -48,10 +55,16 @@ class VulkanEngine {
 		void initCommandPool();
 		void initVertexBuffer();
 		void initIndexBuffer();
+		void initUniformBuffers();
+		void initDescriptorPool();
+		void initDescriptorSets();
 		void initCommandBuffers();
+		void initDescriptorSetLayout();
 		void initGraphicsPipeline();
 		void initSemaphores();
 
+		//draw
 		void draw();
+		void updateUniformBuffers();
 
 };

@@ -1,3 +1,15 @@
+struct UniformBufferControl
+{
+    float4x4 projection;
+    float4x4 model;
+    float4x4 view;
+};
+
+cbuffer ubo 
+{
+    UniformBufferControl ubo;
+}
+
 struct VSInput
 {
     [[vk::location(0)]] float2 Position : POSTION0;
@@ -13,8 +25,7 @@ struct VSOutput
 VSOutput VS_main(VSInput input, uint VertexIndex : SV_VertexID)
 {
     VSOutput output = (VSOutput) 0;
-    output.Position = float4(input.Position, 0.5, 0.5);
-    //output.Color = float3(1.0, 0.0, 1.0);
+    output.Position = mul(ubo.projection, mul(ubo.view, mul(ubo.model, float4(input.Position, 0.0, 1.0))));
     output.Color = input.Color;
     return output;
 }

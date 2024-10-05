@@ -44,23 +44,23 @@ std::vector<uint32_t> readShader(const std::string& filename) {
 	return buffer;
 }
 
-vk::Buffer createBuffer(vk::Device* device, vk::DeviceMemory* deviceMemory, vk::PhysicalDevice* physicalDevice, vk::BufferUsageFlags bufferUsageFlags, vk::MemoryPropertyFlags memoryPropertyFlags, uint32_t bufferSize) {
+void createBuffer(vk::PhysicalDevice &physicalDevice, vk::Device &device, vk::DeviceSize bufferSize, vk::BufferUsageFlags bufferUsageFlags, vk::MemoryPropertyFlags memoryPropertyFlags, vk::Buffer& buffer, vk::DeviceMemory& deviceMemory) {
 	vk::BufferCreateInfo bufferCreateInfo({});
 	bufferCreateInfo.setSize(bufferSize);
 	bufferCreateInfo.setUsage(bufferUsageFlags);
 	bufferCreateInfo.setSharingMode(vk::SharingMode::eExclusive);
-	vk::Buffer vertexBuffer = device->createBuffer(bufferCreateInfo);
+
+	buffer = device.createBuffer(bufferCreateInfo);
 
 	vk::MemoryRequirements memoryRequirements;
-	device->getBufferMemoryRequirements(vertexBuffer, &memoryRequirements);
+	device.getBufferMemoryRequirements(buffer, &memoryRequirements);
 
 	vk::MemoryAllocateInfo memoryAllocateInfo({});
 	memoryAllocateInfo.setAllocationSize(memoryRequirements.size);
-	memoryAllocateInfo.setMemoryTypeIndex(findMemoryType(*physicalDevice, memoryRequirements.memoryTypeBits, memoryPropertyFlags));
-	*deviceMemory = device->allocateMemory(memoryAllocateInfo);
+	memoryAllocateInfo.setMemoryTypeIndex(findMemoryType(physicalDevice, memoryRequirements.memoryTypeBits, memoryPropertyFlags));
+	deviceMemory = device.allocateMemory(memoryAllocateInfo);
 
-	device->bindBufferMemory(vertexBuffer, *deviceMemory, 0);
-	return vertexBuffer;
+	device.bindBufferMemory(buffer, deviceMemory, 0);
 }
 
 void copyBuffer(vk::Device device, vk::Buffer srcBuffer, vk::Buffer dstBuffer, vk::DeviceSize deviceSize, vk::CommandPool commandPool, vk::Queue queue) {

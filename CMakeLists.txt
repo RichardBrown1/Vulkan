@@ -1,7 +1,7 @@
 ﻿# CMakeList.txt : CMake project for VulkanFromScratch, include source and define
 # project specific logic here.
 #
-cmake_minimum_required (VERSION 3.8)
+cmake_minimum_required (VERSION 3.11)
 
 # Enable Hot Reload for MSVC compilers if supported.
 if (POLICY CMP0141)
@@ -21,8 +21,14 @@ FetchContent_Declare(
     GIT_PROGRESS TRUE
 )
 
-FetchContent_MakeAvailable(SDL2)
+FetchContent_Declare(
+    glm
+ 	GIT_REPOSITORY	https://github.com/g-truc/glm.git
+    GIT_TAG 1.0.1
+)
 
+FetchContent_MakeAvailable(SDL2)
+FetchContent_MakeAvailable(glm)
 
 find_package(Vulkan REQUIRED)
 
@@ -52,6 +58,6 @@ else()
 endif()
 
 # TODO: Add tests and install targets if needed
-target_link_libraries(VulkanFromScratch PUBLIC Vulkan::Vulkan SDL2::SDL2main SDL2::SDL2-static )
+target_link_libraries(VulkanFromScratch PUBLIC Vulkan::Vulkan SDL2::SDL2main SDL2::SDL2-static glm::glm)
 
 target_precompile_headers(VulkanFromScratch PUBLIC <optional> <vector> <memory> <string> <vector> <unordered_map> <vulkan/vulkan.h>)
