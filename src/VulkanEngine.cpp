@@ -44,9 +44,9 @@ struct Vertex {
 
 struct UniformBufferObject {
 
-	glm::mat4x4 projection;	
-	glm::mat4x4 model;
-	glm::mat4x4 view;
+	alignas(16) glm::mat4x4 projection;	
+	alignas(16) glm::mat4x4 model;
+	alignas(16) glm::mat4x4 view;
 };
 
 const std::vector<Vertex> vertices = {
